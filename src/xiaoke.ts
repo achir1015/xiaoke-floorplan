@@ -61,6 +61,36 @@ declare global {
 
 export const desktop = (): DesktopBridge | undefined => window.xk;
 
+// --- iPhone／iPad App（WKWebView）：存檔改用分享選單、USDZ 直接 AR 快速查看 ----------------
+
+interface IOSBridge {
+  postMessage(msg: { cmd: string; args?: unknown[] }): Promise<{ status?: string; token?: string; message?: string; path?: string; ar?: boolean } | boolean | null>;
+}
+/** 在 iPhone／iPad App 裡執行時，App 注入 window.XiaokeIOS = true 與 xkq 訊息通道。 */
+export const iosApp = (): IOSBridge | undefined => {
+  const w = window as unknown as { XiaokeIOS?: boolean; webkit?: { messageHandlers?: { xkq?: IOSBridge } } };
+  return w.XiaokeIOS ? w.webkit?.messageHandlers?.xkq : undefined;
+};
+
+export const PAGES = 'https://achir1015.github.io/xiaoke-floorplan';
+
+function toBase64(bytes: Uint8Array): string {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+/** iOS App 存檔：分段傳給 App，結束時 App 打開分享選單（USDZ 則打開 AR 快速查看）。回傳 null＝使用者取消 */
+export async function iosSave(name: string, data: Uint8Array): Promise<{ path: string; ar: boolean } | null> {
+  const ios = iosApp()!;
+  const begin = (await ios.postMessage({ cmd: 'begin_save', args: [name] })) as { status?: string; token?: string };
+  if (begin?.status !== 'ok' || !begin.token) throw new Error('無法建立檔案');
+  const CHUNK = 512 * 1024;
+  for (let i = 0; i < data.length; i += CHUNK) await ios.postMessage({ cmd: 'write_chunk', args: [begin.token, toBase64(data.subarray(i, i + CHUNK))] });
+  const end = (await ios.postMessage({ cmd: 'end_save', args: [begin.token] })) as { status?: string; path?: string; ar?: boolean };
+  return end?.status === 'ok' ? { path: end.path ?? name, ar: !!end.ar } : null;
+}
+
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel);
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const fast = () => /[?&]fastguide/.test(location.search);
@@ -90,6 +120,8 @@ interface Step {
   text: string;
   /** 線上版改用的說明。 */
   web?: string;
+  /** iPhone／iPad App 改用的說明。 */
+  ios?: string;
   /** 說話前先做的示範動作。 */
   before?: () => void | Promise<void>;
   /** 說話途中的動畫示範。 */
@@ -114,6 +146,7 @@ const STEPS: Step[] = [
   {
     target: () => $('#drop'),
     text: '第一步，上傳平面圖。把圖片拖曳到這個框框，或按「選擇圖片」，掃描圖、手機拍照、CAD 截圖都可以，也能直接貼上截圖。現在我先按「範例：兩房一廳」，用範例示範給你看。',
+    ios: '第一步，上傳平面圖。按「選擇圖片」，可以直接拍照、從照片選，或從「檔案」選，掃描圖、CAD 截圖都可以。現在我先按「範例：兩房一廳」，用範例示範給你看。',
     demo: async () => {
       await wait(6500);
       if (app().hasPlan()) return;
@@ -128,6 +161,7 @@ const STEPS: Step[] = [
   {
     target: () => $('#view2d'),
     text: '這裡是 2D 疊圖：紅色是牆、橘色是門、藍色是窗、紫色是柱子，彩色區塊是房間。辨識不完整的地方，可以用上面的工具修正：「畫牆」按住拖曳就能補一道牆，「門」和「窗」點在牆上就會加上去，「刪除」點一下就拿掉。滾輪可以放大縮小。',
+    ios: '這裡是 2D 疊圖：紅色是牆、橘色是門、藍色是窗、紫色是柱子，彩色區塊是房間。辨識不完整的地方，可以用上面的工具修正：「畫牆」用手指拖曳就能補一道牆，「門」和「窗」點在牆上就會加上去，「刪除」點一下就拿掉。兩根手指可以放大縮小。',
     demo: async () => {
       await wait(9000);
       app().setTool('wall');
@@ -144,6 +178,7 @@ const STEPS: Step[] = [
   {
     target: () => $('#center'),
     text: '中間是 3D 模型。用滑鼠左鍵拖曳可以旋轉，滾輪放大縮小，右鍵拖曳可以平移；手機用手指操作。點一下牆、門或房間地板，就能選取它。',
+    ios: '這是 3D 模型。一根手指拖曳可以旋轉，兩根手指捏合可以放大縮小，兩指一起拖曳可以平移。點一下牆、門或房間地板，就能選取它。',
     demo: async () => {
       const s = app().scene();
       const c = s.controls;
@@ -161,6 +196,7 @@ const STEPS: Step[] = [
   {
     target: () => $('#modes'),
     text: '上面可以切換視角：「鳥瞰」從外面看、「俯視」從正上方看，「漫遊」會讓你站在房子裡，用 W A S D 或方向鍵走動、拖曳畫面轉頭，手機會出現搖桿。我帶你進去走走看！',
+    ios: '上面可以切換視角：「鳥瞰」從外面看、「俯視」從正上方看，「漫遊」會讓你站在房子裡，左下會出現搖桿可以走動，拖曳畫面就能轉頭。我帶你進去走走看！',
     demo: async () => {
       await wait(7500);
       await press(btn('#modes [data-mode="walk"]'));
@@ -229,6 +265,7 @@ const STEPS: Step[] = [
   {
     before: () => app().openExport(true),
     target: () => $('#export-menu'),
+    ios: '做好的 3D 模型可以匯出。選 USDZ 會直接打開 AR 快速查看，可以把房子放到桌上，或切到 AR 用原尺寸走進去；GLB 給 VR 眼鏡，另外還有 OBJ、3D 列印用的 STL、截圖和專案檔，都會跳出分享選單，可以存到「檔案」或用 AirDrop 傳出去。',
     web: '做好的 3D 模型可以下載。VR 眼鏡請選 GLB，Meta Quest、SteamVR、Unity 都能用；Apple Vision Pro 和 iPhone、iPad 的擴增實境請選 USDZ；另外還有 OBJ、3D 列印用的 STL、截圖，以及可以再開啟修改的專案檔。所有處理都在你的瀏覽器裡，平面圖不會上傳到網路。',
     text: '做好的 3D 模型可以匯出。VR 眼鏡請選 GLB，Meta Quest、SteamVR、Unity 都能用；Apple Vision Pro 和 iPhone、iPad 的擴增實境請選 USDZ；另外還有 OBJ、3D 列印用的 STL、截圖，以及可以再開啟修改的專案檔。',
     demo: async () => {
@@ -239,11 +276,13 @@ const STEPS: Step[] = [
   {
     target: () => $('#vr-btn'),
     text: '如果你有 VR 眼鏡，在眼鏡的瀏覽器打開線上版，按「VR」就能用真實比例走進房子裡：左手搖桿移動、右手搖桿轉向，扣板機可以瞬間移動到指著的地方。',
+    ios: '想用 VR 眼鏡看，可以匯出專案檔或 GLB，用 AirDrop 傳到 Apple Vision Pro，或在 Meta Quest 的瀏覽器打開線上版開啟。iPhone 和 iPad 則推薦匯出 USDZ，用擴增實境直接走進房子。',
     web: '如果你戴著 Meta Quest 或 Apple Vision Pro，用眼鏡的瀏覽器打開這個網頁，按「VR」就能用真實比例走進房子裡：左手搖桿移動、右手搖桿轉向，扣板機可以瞬間移動到指著的地方。在電腦上做好的模型，可以匯出專案檔，再到眼鏡上開啟。',
   },
   {
     target: () => $('.xk-update'),
     text: '最後，這顆按鈕會檢查新版本，有更新就能直接下載安裝。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
+    ios: '最後，這顆按鈕會檢查新版本，有更新會帶你到安裝頁重新安裝，歷史紀錄都會保留。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
     web: '最後，這顆按鈕會檢查新版本，有更新會自動重新整理。旁邊的「桌面版」可以下載 Windows 和 Mac 版。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
   },
 ];
@@ -409,7 +448,7 @@ export async function startGuide() {
         index = jump;
         continue;
       }
-      const line = !desktop() && step.web ? step.web : step.text;
+      const line = iosApp() && step.ios ? step.ios : !desktop() && step.web ? step.web : step.text;
       text.textContent = line;
       robot.classList.remove('pop');
       void robot.offsetWidth;
@@ -486,6 +525,12 @@ export async function checkUpdate(current: string, quiet = false) {
   try {
     let info: UpdateInfo;
     if (xk) info = await xk.update.check();
+    else if (iosApp()) {
+      // iPhone／iPad App：比對線上版的 version.json，有新版就到安裝頁重新安裝
+      const res = await fetch(`${PAGES}/version.json?t=${Date.now()}`, { cache: 'no-store' });
+      const j = (await res.json()) as { version: string; notes?: string };
+      info = { current, latest: j.version, newer: cmpVer(j.version, current) > 0, notes: j.notes ?? '', page: `${PAGES}/ios/`, canInstall: true, flavor: 'ios' };
+    }
     else {
       // 線上版：比對 version.json，有新版就重新整理頁面（略過快取）
       const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
@@ -499,11 +544,15 @@ export async function checkUpdate(current: string, quiet = false) {
     const d = dialog(`<h2>有新版本 v${esc(info.latest)}</h2><p>目前版本 v${esc(info.current)}</p>
       ${info.notes ? `<pre class="xk-notes">${esc(info.notes)}</pre>` : ''}
       <progress hidden max="1" value="0"></progress><p class="xk-msg"></p>
-      <div class="xk-row"><button type="button" class="xk-go">${info.canInstall ? (xk ? '下載並安裝' : '立即更新') : '開啟下載頁'}</button><button class="ghost">稍後</button></div>`);
+      <div class="xk-row"><button type="button" class="xk-go">${info.canInstall ? (xk ? '下載並安裝' : iosApp() ? '前往安裝頁更新' : '立即更新') : '開啟下載頁'}</button><button class="ghost">稍後</button></div>`);
     const go = d.querySelector<HTMLButtonElement>('.xk-go')!;
     const bar = d.querySelector<HTMLProgressElement>('progress')!;
     const msg = d.querySelector<HTMLElement>('.xk-msg')!;
     go.addEventListener('click', async () => {
+      if (iosApp()) {
+        await iosApp()!.postMessage({ cmd: 'open_url', args: [`${PAGES}/ios/`] });
+        return;
+      }
       if (!xk) {
         location.reload();
         return;

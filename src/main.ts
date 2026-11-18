@@ -5,7 +5,7 @@ import { PlanScene, type ViewMode } from './scene';
 import { Editor2D, type Tool } from './editor2d';
 import { runCommand, EXAMPLES } from './command';
 import { aiAnalyze, aiAssist, aiCommand, loadAi, saveAi, transcribe, MODELS } from './ai';
-import { ROBOT_SVG, desktop, startGuide, guideOnFirstRun, initUpdateButton, checkUpdate } from './xiaoke';
+import { ROBOT_SVG, desktop, iosApp, iosSave, startGuide, guideOnFirstRun, initUpdateButton, checkUpdate } from './xiaoke';
 import * as store from './store';
 
 declare const __APP_VERSION__: string;
@@ -383,6 +383,17 @@ async function setMode(m: string) {
 
 function vrHelp() {
   const url = 'https://achir1015.github.io/xiaoke-floorplan/';
+  if (iosApp()) {
+    dialog(`<h2>🥽 用 AR／VR 觀看</h2>
+      <p>iPhone、iPad 不能戴 VR 眼鏡，但可以用<b>擴增實境（AR）</b>走進房子：</p>
+      <ol class="vr-list">
+        <li><b>匯出 USDZ</b>：會直接打開「AR 快速查看」，點右上「AR」把房子放到桌上，或用原尺寸放在地上走進去。</li>
+        <li><b>Apple Vision Pro</b>：把 USDZ 用 AirDrop 傳過去就能看。</li>
+        <li><b>Meta Quest</b>：匯出專案檔（.xkplan），在眼鏡的瀏覽器打開 <code>${url}</code> 開啟後按「🥽 VR」。</li>
+      </ol>
+      <div class="xk-row"><button type="button" class="ghost" data-ex="usdz">匯出 USDZ（AR）</button><button type="button" class="ghost" data-ex="json">匯出專案檔</button><button>關閉</button></div>`);
+    return;
+  }
   dialog(`<h2>🥽 用 VR 眼鏡觀看</h2>
     <p>這台裝置沒有連接 VR 眼鏡。有三種方式可以用 VR 看你的 3D 平面圖：</p>
     <ol class="vr-list">
@@ -415,6 +426,11 @@ async function saveBlob(blob: Blob, name: string) {
     const path = await xk.saveFile(name, new Uint8Array(await blob.arrayBuffer()));
     if (path) say(`已存檔：${path}`, 'ok');
     return path;
+  }
+  if (iosApp()) {
+    const r = await iosSave(name, new Uint8Array(await blob.arrayBuffer()));
+    if (r) say(r.ar ? `已用 AR 快速查看打開 ${name}：點「AR」就能把房子放進眼前的空間；檔案也存在「檔案」App 的「小柯平面圖3D」資料夾。` : `已存檔：${name}（「檔案」App 的「小柯平面圖3D」資料夾也有一份）`, 'ok');
+    return r?.path ?? null;
   }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -831,4 +847,4 @@ initUpdateButton(VERSION);
 void renderHistory();
 say('你好，我是小柯！上傳一張建築平面圖，我會把它變成可以走進去的 3D 空間。也可以先按「範例：兩房一廳」試試看。', 'bot');
 guideOnFirstRun();
-if (!WEB) setTimeout(() => void checkUpdate(VERSION, true), 4000);
+if (!WEB || iosApp()) setTimeout(() => void checkUpdate(VERSION, true), 4000);

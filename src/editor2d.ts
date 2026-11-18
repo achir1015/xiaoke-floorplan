@@ -230,8 +230,30 @@ export class Editor2D {
       this.view.y = py - wz * s;
       this.draw();
     }, { passive: false });
+    // 兩指縮放／平移（手機、平板）
+    const touches = new Map<number, [number, number]>();
+    let pinch: { d: number; mx: number; my: number; s: number; vx: number; vy: number } | null = null;
+    const pinchState = () => {
+      const [a, b] = [...touches.values()];
+      return { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, mx: (a[0] + b[0]) / 2, my: (a[1] + b[1]) / 2 };
+    };
     c.addEventListener('pointerdown', (e) => {
-      c.setPointerCapture(e.pointerId);
+      try {
+        c.setPointerCapture(e.pointerId);
+      } catch {
+        // 合成事件沒有真的指標
+      }
+      if (e.pointerType === 'touch') {
+        touches.set(e.pointerId, pos(e));
+        if (touches.size === 2) {
+          // 第二根手指放下：取消正在畫的牆，改成縮放
+          this.drag = null;
+          pinch = { ...pinchState(), s: this.view.s, vx: this.view.x, vy: this.view.y };
+          this.draw();
+          return;
+        }
+        if (touches.size > 2) return;
+      }
       const [px, py] = pos(e);
       const [wx, wz] = this.toWorld(px, py);
       const pan = e.button === 1 || e.button === 2 || (this.tool === 'select' && !this.hit(wx, wz));
@@ -243,6 +265,17 @@ export class Editor2D {
       }
     });
     c.addEventListener('pointermove', (e) => {
+      if (touches.has(e.pointerId)) touches.set(e.pointerId, pos(e));
+      if (pinch && touches.size >= 2) {
+        const now = pinchState();
+        const s = Math.max(4, Math.min(600, (pinch.s * now.d) / pinch.d));
+        // 兩指中點下的那一點保持不動，再加上中點的移動量
+        const wx = (pinch.mx - pinch.vx) / pinch.s, wz = (pinch.my - pinch.vy) / pinch.s;
+        this.userView = true;
+        this.view = { s, x: now.mx - wx * s, y: now.my - wz * s };
+        this.draw();
+        return;
+      }
       if (!this.drag) return;
       const [px, py] = pos(e);
       if (this.drag.a) {
@@ -256,7 +289,21 @@ export class Editor2D {
         this.draw();
       }
     });
+    const lift = (e: PointerEvent) => {
+      touches.delete(e.pointerId);
+      if (pinch && touches.size < 2) {
+        pinch = null;
+        this.drag = null;
+        return true;
+      }
+      return false;
+    };
+    c.addEventListener('pointercancel', (e) => {
+      lift(e);
+      this.drag = null;
+    });
     c.addEventListener('pointerup', (e) => {
+      if (lift(e)) return;
       const d = this.drag;
       this.drag = null;
       if (!d) return;

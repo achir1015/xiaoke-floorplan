@@ -1,5 +1,6 @@
 # 小柯機器人建築平面圖轉3D工具
 <img width="1906" height="987" alt="image" src="https://github.com/user-attachments/assets/ac64bab1-777d-4a6c-818a-bda5cb610d16" />
+<img width="800" height="450" alt="image" src="https://github.com/user-attachments/assets/91743010-dcc1-4715-a9b2-141c516bfe21" />
 
 
 https://github.com/user-attachments/assets/bdeefeab-f409-41ca-a2e3-ebc4aa4d3520

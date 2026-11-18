@@ -1,4 +1,9 @@
 # 小柯機器人建築平面圖轉3D工具
+<img width="1906" height="987" alt="image" src="https://github.com/user-attachments/assets/ac64bab1-777d-4a6c-818a-bda5cb610d16" />
+
+
+https://github.com/user-attachments/assets/bdeefeab-f409-41ca-a2e3-ebc4aa4d3520
+
 
 上傳一張 2D 建築平面圖，小柯會自動辨識牆、門、窗、柱子與房間，蓋成可以走進去參觀的 3D 空間；可以用中文或英文說一句話修改模型，還能戴上 VR 眼鏡用真實比例觀看。
 

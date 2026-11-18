@@ -41,7 +41,8 @@ python scripts/make_icon.py                   # 圖示（小柯＋藍圖上立�
 
 ## 狀態
 
-- 2026-11-18 Windows v1.0.0：已 /S 安裝到 %LOCALAPPDATA%\Programs\XiaokeFloorplan（桌面＋開始選單捷徑），安裝檔副本 `../安裝檔`；開發版與已安裝版 e2e 29 項全過（含教學）。尚未建 GitHub repo、未發 Release（要先問使用者）。
+- 2026-11-18 Windows v1.0.0：已 /S 安裝到 %LOCALAPPDATA%\Programs\XiaokeFloorplan（桌面＋開始選單捷徑），安裝檔副本 `../安裝檔`；開發版與已安裝版 e2e 29 項全過（含教學）。
+- 2026-11-18 使用者同意後建公開 repo https://github.com/achir1015/xiaoke-floorplan（main），v1.0.0 Release 手動上傳安裝版＋免安裝版（無 CI，說明 .github/release-notes.md）；e2e/update-check.mjs 實測已安裝版讀得到 v1.0.0 與安裝檔。沒有 gh CLI：用 git credential fill 取 token 打 API。
 
 ## 坑
 

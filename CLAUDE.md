@@ -12,7 +12,7 @@
 
 上傳 2D 建築平面圖 → 辨識牆、門、窗、柱、房間 → Three.js 3D（鳥瞰／俯視／漫遊／WebXR VR）→ 中英文自然語言指令修改 → 匯出 GLB／USDZ／OBJ／STL／PNG／.xkplan。
 構想參考 akaiHuang/ai-floorplan-to-3d（README 標 MIT，但沒有 LICENSE 檔），**沒有用它的程式碼**，本專案 MIT。
-平台順序：Windows（v1.0.0）→ Mac（v1.1.0）→ 線上版 → iPhone／iPad（線上安裝）→ Android。外殼、語音教學、更新沿用 `xiaoke-compress`。
+平台順序：Windows（v1.0.0）→ Mac（v1.1.0）→ 線上版（v1.2.0）→ iPhone／iPad（線上安裝）→ Android。外殼、語音教學、更新沿用 `xiaoke-compress`。
 
 - `src/plan.ts`：資料格式（公尺；牆是中心線 x1,z1→x2,z2；門窗掛在牆上自動挖洞；房間是多邊形）、`normalizePlan`（也吃參考專案的方塊牆格式）、`repairJson`（AI 輸出修復）。
 - `src/detect.ts`：本機辨識（純函式，vitest 可測）。Otsu → 每像素筆畫粗細 min(水平連續, 垂直連續)，只算細長筆畫估牆厚 T → 空心雙線牆用白間距估閉合半徑、粗而長筆畫大增才採用 → 水平／垂直牆段 → 不連主建築的群組（文字、標題）丟掉 → 同線牆段間的缺口：有平行細線＝窗、空的＝門（>1.6 m 當落地窗）；空心牆內 ≥3 條平行線切成窗 → 柱：實心、四周空、方或圓 → 房間：牆＋門窗當隔間，從圖邊填外面，剩下的區塊 Moore 追外框＋RDP。比例預設依門寬中位數 0.9 m（≥2 扇門），否則依牆厚。
@@ -45,11 +45,13 @@ python scripts/make_icon.py                   # 圖示（小柯＋藍圖上立�
 - 2026-11-18 使用者同意後建公開 repo https://github.com/achir1015/xiaoke-floorplan（main），v1.0.0 Release 手動上傳安裝版＋免安裝版（無 CI，說明 .github/release-notes.md）；e2e/update-check.mjs 實測已安裝版讀得到 v1.0.0 與安裝檔。沒有 gh CLI：用 git credential fill 取 token 打 API。
 
 - 2026-11-18 v1.1.0 Mac 版：`.github/workflows/build.yml` 推 package.json 版本即建 win＋mac-arm64＋mac-x64 並發 Release（說明 .github/release-notes.md）；build/adhoc-sign.cjs 做 ad-hoc 簽章（未公證）。Intel Mac（yu-juhwu@192.168.6.32，macOS 26.3）`scripts/mac-install-test.sh <dmg> --guide` 29 項通過（測試資料夾 ~/Developer/xiaoke-floorplan-test，只放 e2e/desktop.mjs 與 scripts）；Apple 晶片 dmg 確認 arm64、簽章通過（沒實機）。Windows 程式內更新 1.0.0→1.1.0 實測成功（e2e/update-install.mjs，會自動重開新版）。等 CI：`GITHUB_TOKEN=… node e2e/wait-ci.mjs`。
+- 2026-11-18 v1.2.0 線上版 https://achir1015.github.io/xiaoke-floorplan/：`.github/workflows/pages.yml` 推 main（src/public/index.html/package.json 有改）自動部署（Pages build_type=workflow，已用 API 啟用）。網頁版與桌面版同一份程式（body.web；存檔改下載；沒金鑰時 Chrome／Safari 用內建語音辨識）。HTTPS 所以 VR 眼鏡瀏覽器可直接 WebXR。預覽：xiaoke-floorplan-web（vite 5210）、xiaoke-floorplan-dist（python 靜態 5211）。live 站實測辨識、指令、GLB 匯出、version.json 正常。
 
 ## 坑
 
 - NSIS 在中文路徑輸出會失敗：輸出到 E:\xkf-build。
 - 新 userData 第一次開會自動播教學，e2e 要帶 noguide（XK_QUERY）。
 - e2e 結束時 child.kill 在 Windows 可能殺不乾淨，留下的視窗會讓下一個測試連不上：先 Stop-Process XiaokeFloorplan。
+- Claude 預覽窗格在手機模擬時 requestAnimationFrame 一秒只跑約一格：測搖桿移動要看位置有沒有變，不要看速度。
 - Bash 工具的 heredoc 內容有反引號會解析失敗：大檔用 Write 工具寫。
 - 模糊／雜訊掃描圖：內牆比外牆細，牆門檻用 0.45T；文字會被誤認為柱 → 柱要「方或圓＋實心＋四周空」。斜放（歪掉超過 1°）的圖還沒做自動校正。

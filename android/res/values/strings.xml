@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">小柯平面圖3D</string>
+    <style name="AppTheme" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#165099</item>
+        <item name="android:colorPrimaryDark">#165099</item>
+        <item name="android:colorAccent">#2F7DE0</item>
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:navigationBarColor">#EEF3F9</item>
+        <item name="android:windowBackground">@android:color/white</item>
+    </style>
+</resources>

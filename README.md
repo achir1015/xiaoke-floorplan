@@ -31,7 +31,7 @@ https://github.com/user-attachments/assets/bdeefeab-f409-41ca-a2e3-ebc4aa4d3520
 | macOS（Apple 晶片／Intel） | v1.1.0 起 |
 | 線上版 https://achir1015.github.io/xiaoke-floorplan/ （VR 眼鏡瀏覽器可直接進入 VR） | v1.2.0 起 |
 | iPhone／iPad（線上安裝 https://achir1015.github.io/xiaoke-floorplan/ios/ ，USDZ 直接 AR） | v1.3.0 起 |
-| Android | 規劃中 |
+| Android（APK 在 Release） | v1.4.0 起 |
 
 ## 開發
 

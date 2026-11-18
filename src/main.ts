@@ -5,7 +5,7 @@ import { PlanScene, type ViewMode } from './scene';
 import { Editor2D, type Tool } from './editor2d';
 import { runCommand, EXAMPLES } from './command';
 import { aiAnalyze, aiAssist, aiCommand, loadAi, saveAi, transcribe, MODELS } from './ai';
-import { ROBOT_SVG, desktop, iosApp, iosSave, startGuide, guideOnFirstRun, initUpdateButton, checkUpdate } from './xiaoke';
+import { ROBOT_SVG, desktop, iosApp, iosSave, androidApp, androidSave, startGuide, guideOnFirstRun, initUpdateButton, checkUpdate } from './xiaoke';
 import * as store from './store';
 
 declare const __APP_VERSION__: string;
@@ -427,6 +427,11 @@ async function saveBlob(blob: Blob, name: string) {
     if (path) say(`已存檔：${path}`, 'ok');
     return path;
   }
+  if (androidApp()) {
+    const path = androidSave(name, new Uint8Array(await blob.arrayBuffer()));
+    say(`已存到 ${path}`, 'ok');
+    return path;
+  }
   if (iosApp()) {
     const r = await iosSave(name, new Uint8Array(await blob.arrayBuffer()));
     if (r) say(r.ar ? `已用 AR 快速查看打開 ${name}：點「AR」就能把房子放進眼前的空間；檔案也存在「檔案」App 的「小柯平面圖3D」資料夾。` : `已存檔：${name}（「檔案」App 的「小柯平面圖3D」資料夾也有一份）`, 'ok');
@@ -842,9 +847,32 @@ window.xkApp = {
   openProjectText: (t) => openProject(new Blob([t], { type: 'application/json' })),
 };
 
+// Android 返回鍵：先關教學、對話框、選單，或從漫遊回鳥瞰；都沒有才讓 App 處理（按兩次離開）
+(window as unknown as { __xkBack?: () => boolean }).__xkBack = () => {
+  const close = document.querySelector<HTMLButtonElement>('.xk-guide .xk-close');
+  if (close) {
+    close.click();
+    return true;
+  }
+  const dlg = document.querySelector<HTMLDialogElement>('dialog[open]');
+  if (dlg) {
+    dlg.close();
+    return true;
+  }
+  if ($('#export-menu').classList.contains('open')) {
+    $('#export-menu').classList.remove('open');
+    return true;
+  }
+  if (scene.mode === 'walk') {
+    void setMode('orbit');
+    return true;
+  }
+  return false;
+};
+
 $('#guide-btn').addEventListener('click', () => void startGuide());
 initUpdateButton(VERSION);
 void renderHistory();
 say('你好，我是小柯！上傳一張建築平面圖，我會把它變成可以走進去的 3D 空間。也可以先按「範例：兩房一廳」試試看。', 'bot');
 guideOnFirstRun();
-if (!WEB || iosApp()) setTimeout(() => void checkUpdate(VERSION, true), 4000);
+if (!WEB || iosApp() || androidApp()) setTimeout(() => void checkUpdate(VERSION, true), 4000);

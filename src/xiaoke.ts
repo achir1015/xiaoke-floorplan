@@ -74,6 +74,34 @@ export const iosApp = (): IOSBridge | undefined => {
 
 export const PAGES = 'https://achir1015.github.io/xiaoke-floorplan';
 
+// --- Android App（WebView）：window.XiaokeAndroid，回傳值都是 JSON 字串 ----------------------
+
+interface AndroidBridge {
+  beginSave(name: string): string;
+  writeChunk(token: string, b64: string): string;
+  endSave(token: string): string;
+  checkUpdate(): string;
+  installUpdate(url: string, ver: string): string;
+  updateStatus(): string;
+  openUrl(url: string): boolean;
+  ttsAvailable(): boolean;
+  ttsSpeak(text: string, rate: number, id: string): void;
+  ttsStop(): void;
+}
+export const androidApp = (): AndroidBridge | undefined => (window as unknown as { XiaokeAndroid?: AndroidBridge }).XiaokeAndroid;
+
+/** Android App 存檔：分段傳給 App，存到「下載/小柯平面圖3D」。回傳顯示用的路徑 */
+export function androidSave(name: string, data: Uint8Array): string {
+  const android = androidApp()!;
+  const begin = JSON.parse(android.beginSave(name)) as { status: string; token?: string; path?: string; message?: string };
+  if (begin.status !== 'ok' || !begin.token) throw new Error(begin.message ?? '無法建立檔案');
+  const CHUNK = 256 * 1024;
+  for (let i = 0; i < data.length; i += CHUNK) android.writeChunk(begin.token, toBase64(data.subarray(i, i + CHUNK)));
+  const end = JSON.parse(android.endSave(begin.token)) as { status: string; path?: string; message?: string };
+  if (end.status !== 'ok') throw new Error(end.message ?? '存檔失敗');
+  return end.path ?? name;
+}
+
 function toBase64(bytes: Uint8Array): string {
   let s = '';
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -122,6 +150,8 @@ interface Step {
   web?: string;
   /** iPhone／iPad App 改用的說明。 */
   ios?: string;
+  /** Android App 改用的說明（沒有就用 ios 的觸控說法）。 */
+  android?: string;
   /** 說話前先做的示範動作。 */
   before?: () => void | Promise<void>;
   /** 說話途中的動畫示範。 */
@@ -146,6 +176,7 @@ const STEPS: Step[] = [
   {
     target: () => $('#drop'),
     text: '第一步，上傳平面圖。把圖片拖曳到這個框框，或按「選擇圖片」，掃描圖、手機拍照、CAD 截圖都可以，也能直接貼上截圖。現在我先按「範例：兩房一廳」，用範例示範給你看。',
+    android: '第一步，上傳平面圖。按「選擇圖片」，從相簿或檔案選一張平面圖，掃描圖、手機拍照、CAD 截圖都可以。現在我先按「範例：兩房一廳」，用範例示範給你看。',
     ios: '第一步，上傳平面圖。按「選擇圖片」，可以直接拍照、從照片選，或從「檔案」選，掃描圖、CAD 截圖都可以。現在我先按「範例：兩房一廳」，用範例示範給你看。',
     demo: async () => {
       await wait(6500);
@@ -265,6 +296,7 @@ const STEPS: Step[] = [
   {
     before: () => app().openExport(true),
     target: () => $('#export-menu'),
+    android: '做好的 3D 模型可以匯出，檔案會存到手機「下載」裡的「小柯平面圖3D」資料夾。VR 眼鏡請選 GLB，Meta Quest、SteamVR、Unity 都能用；Apple Vision Pro 和 iPhone 的擴增實境請選 USDZ；另外還有 OBJ、3D 列印用的 STL、截圖，以及可以再開啟修改的專案檔。',
     ios: '做好的 3D 模型可以匯出。選 USDZ 會直接打開 AR 快速查看，可以把房子放到桌上，或切到 AR 用原尺寸走進去；GLB 給 VR 眼鏡，另外還有 OBJ、3D 列印用的 STL、截圖和專案檔，都會跳出分享選單，可以存到「檔案」或用 AirDrop 傳出去。',
     web: '做好的 3D 模型可以下載。VR 眼鏡請選 GLB，Meta Quest、SteamVR、Unity 都能用；Apple Vision Pro 和 iPhone、iPad 的擴增實境請選 USDZ；另外還有 OBJ、3D 列印用的 STL、截圖，以及可以再開啟修改的專案檔。所有處理都在你的瀏覽器裡，平面圖不會上傳到網路。',
     text: '做好的 3D 模型可以匯出。VR 眼鏡請選 GLB，Meta Quest、SteamVR、Unity 都能用；Apple Vision Pro 和 iPhone、iPad 的擴增實境請選 USDZ；另外還有 OBJ、3D 列印用的 STL、截圖，以及可以再開啟修改的專案檔。',
@@ -276,12 +308,14 @@ const STEPS: Step[] = [
   {
     target: () => $('#vr-btn'),
     text: '如果你有 VR 眼鏡，在眼鏡的瀏覽器打開線上版，按「VR」就能用真實比例走進房子裡：左手搖桿移動、右手搖桿轉向，扣板機可以瞬間移動到指著的地方。',
+    android: '想用 VR 眼鏡看，可以匯出專案檔，在 Meta Quest 的瀏覽器打開線上版開啟後按「VR」，就能用真實比例走進房子；或匯出 GLB 給 VR 眼鏡和 Unity 使用。',
     ios: '想用 VR 眼鏡看，可以匯出專案檔或 GLB，用 AirDrop 傳到 Apple Vision Pro，或在 Meta Quest 的瀏覽器打開線上版開啟。iPhone 和 iPad 則推薦匯出 USDZ，用擴增實境直接走進房子。',
     web: '如果你戴著 Meta Quest 或 Apple Vision Pro，用眼鏡的瀏覽器打開這個網頁，按「VR」就能用真實比例走進房子裡：左手搖桿移動、右手搖桿轉向，扣板機可以瞬間移動到指著的地方。在電腦上做好的模型，可以匯出專案檔，再到眼鏡上開啟。',
   },
   {
     target: () => $('.xk-update'),
     text: '最後，這顆按鈕會檢查新版本，有更新就能直接下載安裝。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
+    android: '最後，這顆按鈕會檢查新版本，有更新就能直接下載安裝。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
     ios: '最後，這顆按鈕會檢查新版本，有更新會帶你到安裝頁重新安裝，歷史紀錄都會保留。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
     web: '最後，這顆按鈕會檢查新版本，有更新會自動重新整理。旁邊的「桌面版」可以下載 Windows 和 Mac 版。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
   },
@@ -301,7 +335,43 @@ function pickVoice(): SpeechSynthesisVoice | undefined {
   return undefined;
 }
 
+let ttsSeq = 0;
+const ttsWaiting = new Map<string, () => void>();
+(window as unknown as { __xkTtsDone?: (id: string) => void }).__xkTtsDone = (id: string) => {
+  ttsWaiting.get(id)?.();
+  ttsWaiting.delete(id);
+};
+/** Android 的 WebView 沒有網頁語音：改用系統的文字轉語音。 */
+function speakAndroid(android: AndroidBridge, text: string, mouth: HTMLElement): Promise<void> {
+  return new Promise((resolve) => {
+    const id = `t${++ttsSeq}`;
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      cutSpeech = null;
+      ttsWaiting.delete(id);
+      mouth.classList.remove('talk');
+      resolve();
+    };
+    cutSpeech = () => {
+      android.ttsStop();
+      finish();
+    };
+    ttsWaiting.set(id, finish);
+    mouth.classList.add('talk');
+    if (fast() || /[?&]mute/.test(location.search)) {
+      setTimeout(finish, fast() ? 300 : Math.max(2500, text.length * 180));
+      return;
+    }
+    setTimeout(finish, Math.max(4000, text.length * 300) + 2000);
+    android.ttsSpeak(text, 1.0, id);
+  });
+}
+
 function speak(text: string, mouth: HTMLElement): Promise<void> {
+  const android = androidApp();
+  if (android?.ttsAvailable()) return speakAndroid(android, text, mouth);
   return new Promise((resolve) => {
     if (!('speechSynthesis' in window) || /[?&]mute/.test(location.search)) {
       mouth.classList.add('talk');
@@ -369,6 +439,7 @@ export async function startGuide() {
   const pauseBtn = layer.querySelector<HTMLButtonElement>('.xk-pause')!;
   let wake: (() => void) | null = null;
   const interrupt = () => {
+    androidApp()?.ttsStop();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     cutSpeech?.();
     wake?.();
@@ -384,6 +455,7 @@ export async function startGuide() {
   pauseBtn.addEventListener('click', () => {
     paused = !paused;
     pauseBtn.textContent = paused ? '▶︎ 繼續' : '⏸';
+    if (paused && androidApp()) androidApp()!.ttsStop();
     if (paused && 'speechSynthesis' in window) speechSynthesis.pause();
     else {
       if ('speechSynthesis' in window) speechSynthesis.resume();
@@ -448,7 +520,8 @@ export async function startGuide() {
         index = jump;
         continue;
       }
-      const line = iosApp() && step.ios ? step.ios : !desktop() && step.web ? step.web : step.text;
+      const touchText = step.android ?? step.ios;
+      const line = androidApp() && touchText ? touchText : iosApp() && step.ios ? step.ios : !desktop() && step.web ? step.web : step.text;
       text.textContent = line;
       robot.classList.remove('pop');
       void robot.offsetWidth;
@@ -466,6 +539,7 @@ export async function startGuide() {
       index = jump ?? index + 1;
     }
   } finally {
+    androidApp()?.ttsStop();
     if ('speechSynthesis' in window) speechSynthesis.cancel();
     document.removeEventListener('keydown', onKey);
     layer.remove();
@@ -522,10 +596,16 @@ export function initUpdateButton(current: string) {
 
 export async function checkUpdate(current: string, quiet = false) {
   const xk = desktop();
+  let apkUrl = '';
   try {
     let info: UpdateInfo;
     if (xk) info = await xk.update.check();
-    else if (iosApp()) {
+    else if (androidApp()) {
+      const j = JSON.parse(androidApp()!.checkUpdate()) as { status: string; current: string; latest: string; url: string; page: string; notes: string; message?: string };
+      if (j.status !== 'ok') throw new Error(j.message ?? '查詢失敗');
+      apkUrl = j.url;
+      info = { current: j.current, latest: j.latest, newer: cmpVer(j.latest, j.current) > 0, notes: j.notes, page: j.page, canInstall: !!j.url, flavor: 'android' };
+    } else if (iosApp()) {
       // iPhone／iPad App：比對線上版的 version.json，有新版就到安裝頁重新安裝
       const res = await fetch(`${PAGES}/version.json?t=${Date.now()}`, { cache: 'no-store' });
       const j = (await res.json()) as { version: string; notes?: string };
@@ -544,11 +624,31 @@ export async function checkUpdate(current: string, quiet = false) {
     const d = dialog(`<h2>有新版本 v${esc(info.latest)}</h2><p>目前版本 v${esc(info.current)}</p>
       ${info.notes ? `<pre class="xk-notes">${esc(info.notes)}</pre>` : ''}
       <progress hidden max="1" value="0"></progress><p class="xk-msg"></p>
-      <div class="xk-row"><button type="button" class="xk-go">${info.canInstall ? (xk ? '下載並安裝' : iosApp() ? '前往安裝頁更新' : '立即更新') : '開啟下載頁'}</button><button class="ghost">稍後</button></div>`);
+      <div class="xk-row"><button type="button" class="xk-go">${info.canInstall ? (xk || androidApp() ? '下載並安裝' : iosApp() ? '前往安裝頁更新' : '立即更新') : '開啟下載頁'}</button><button class="ghost">稍後</button></div>`);
     const go = d.querySelector<HTMLButtonElement>('.xk-go')!;
     const bar = d.querySelector<HTMLProgressElement>('progress')!;
     const msg = d.querySelector<HTMLElement>('.xk-msg')!;
     go.addEventListener('click', async () => {
+      const android = androidApp();
+      if (android) {
+        go.disabled = true;
+        bar.hidden = false;
+        android.installUpdate(apkUrl, info.latest);
+        const timer = setInterval(() => {
+          const st = JSON.parse(android.updateStatus()) as { state: string; pct: number };
+          bar.value = st.pct / 100;
+          msg.textContent =
+            st.state === 'permission' ? '請在設定畫面允許「安裝未知應用程式」，回來後再按一次。'
+            : st.state === 'downloading' ? `下載中 ${st.pct}%`
+            : st.state === 'launching' ? '下載完成，請在跳出的畫面按「更新」。'
+            : st.state === 'error' ? '更新失敗，請稍後再試。' : '';
+          if (st.state !== 'downloading') {
+            clearInterval(timer);
+            go.disabled = false;
+          }
+        }, 500);
+        return;
+      }
       if (iosApp()) {
         await iosApp()!.postMessage({ cmd: 'open_url', args: [`${PAGES}/ios/`] });
         return;

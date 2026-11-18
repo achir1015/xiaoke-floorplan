@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#165099" />
+    <meta name="description" content="小柯機器人建築平面圖轉3D工具：上傳 2D 平面圖，自動產生可漫遊、可用 VR 眼鏡觀看的 3D 空間" />
+    <title>小柯機器人建築平面圖轉3D工具</title>
+    <link rel="icon" type="image/png" href="./favicon.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+  </head>
+  <body>
+    <header id="top">
+      <img class="logo" src="./logo.png" alt="" />
+      <div class="title">
+        <h1>小柯機器人建築平面圖轉3D工具</h1>
+        <p>上傳平面圖 → 自動辨識牆門窗 → 3D 漫遊・VR・自然語言修改</p>
+      </div>
+      <div class="spacer"></div>
+      <button type="button" id="guide-btn" class="ghost pill" title="語音動態教學"><span class="mini-robot"></span>語音教學</button>
+      <button type="button" id="settings-btn" class="ghost pill" title="AI 金鑰與模型">⚙ 設定</button>
+      <a id="get-desktop" class="pill-link web-only" href="https://github.com/achir1015/xiaoke-floorplan/releases/latest" target="_blank" rel="noopener" title="下載 Windows／Mac 桌面版">💻 桌面版</a>
+      <button type="button" class="ghost pill xk-update" title="檢查更新">⟳ 檢查更新</button>
+      <span id="ver" class="ver"></span>
+    </header>
+
+    <main id="layout">
+      <!-- 左：上傳與 2D -->
+      <section id="left" class="panel">
+        <div id="drop" tabindex="0">
+          <div class="drop-art" aria-hidden="true">
+            <svg viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="40" rx="5" fill="#fff" stroke="#165099" stroke-width="3"/><path d="M8 32h20v20M28 12v12M40 32h16M40 32v20" stroke="#165099" stroke-width="3" fill="none"/><circle cx="50" cy="16" r="11" fill="#16a873"/><path d="M50 22V10M45 15l5-5 5 5" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div class="drop-text">
+            <strong>把平面圖拖曳到這裡</strong>
+            <span>JPG、PNG、WebP、BMP（掃描圖、手機拍照、CAD 截圖都可以）</span>
+          </div>
+          <div class="drop-btns">
+            <button type="button" id="pick" class="primary">＋ 選擇圖片</button>
+            <button type="button" id="sample1" class="ghost small">範例：兩房一廳</button>
+            <button type="button" id="sample2" class="ghost small">範例：三房兩廳</button>
+            <button type="button" id="open-proj" class="ghost small">開啟專案檔</button>
+          </div>
+        </div>
+
+        <div id="analyze-box" class="box">
+          <div class="row">
+            <label for="method">辨識方式</label>
+            <select id="method">
+              <option value="local">本機辨識（免費、離線）</option>
+              <option value="assist">本機＋AI 判讀房名與比例（推薦）</option>
+              <option value="ai">AI 讀整張圖</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="scale-by" title="用什麼推算圖的比例（公尺）">比例依據</label>
+            <select id="scale-by">
+              <option value="door">一般門寬</option>
+              <option value="wall">一般牆厚</option>
+            </select>
+            <input type="number" id="scale-m" min="0.05" max="3" step="0.01" value="0.9" /><span class="muted">公尺</span>
+          </div>
+          <div class="row">
+            <label for="wall-h">牆高</label>
+            <input type="number" id="wall-h" min="2" max="10" step="0.1" value="3" /><span class="muted">公尺</span>
+          </div>
+          <div class="row">
+            <button type="button" id="analyze" class="go">🔍 開始辨識</button>
+            <span id="analyze-msg" class="muted"></span>
+          </div>
+        </div>
+
+        <div id="view2d-head">
+          <div class="seg" id="tools">
+            <button type="button" data-tool="select" class="on" title="點選物件；拖曳空白處平移；滾輪縮放">↖ 選取</button>
+            <button type="button" data-tool="wall" title="按住拖曳畫一道牆">▬ 畫牆</button>
+            <button type="button" data-tool="door" title="點在牆上加一扇門">🚪 門</button>
+            <button type="button" data-tool="window" title="點在牆上加一扇窗">🪟 窗</button>
+            <button type="button" data-tool="column" title="點一下加柱子">▪ 柱</button>
+            <button type="button" data-tool="delete" title="點物件刪除">✕ 刪除</button>
+          </div>
+          <label class="chk"><input type="checkbox" id="overlay" checked />疊圖</label>
+        </div>
+        <div id="view2d"><div id="empty2d" class="empty"><div class="empty-robot"></div><p>先上傳一張平面圖，或按上面的「範例」試試看。</p></div></div>
+        <div id="calib" class="box">
+          <div class="row">
+            <label for="calib-w" title="輸入建築外框的實際寬度，整張圖會等比例換算">實際總寬</label>
+            <input type="number" id="calib-w" min="1" max="500" step="0.1" /><span class="muted">公尺</span>
+            <button type="button" id="calib-go" class="ghost small">校正比例</button>
+          </div>
+          <div id="stats" class="chips"></div>
+        </div>
+      </section>
+
+      <!-- 中：3D -->
+      <section id="center">
+        <div id="view3d"></div>
+        <div id="toolbar3d">
+          <div class="seg" id="modes">
+            <button type="button" data-mode="orbit" class="on" title="滑鼠拖曳旋轉、滾輪縮放、右鍵平移">🛰 鳥瞰</button>
+            <button type="button" data-mode="top" title="從正上方看">⬇ 俯視</button>
+            <button type="button" data-mode="walk" title="W A S D／方向鍵走動，拖曳畫面轉頭">🚶 漫遊</button>
+            <button type="button" data-mode="vr" id="vr-btn" title="戴上 VR 眼鏡（Meta Quest 等）沉浸式觀看">🥽 VR</button>
+          </div>
+          <div class="seg">
+            <button type="button" id="t-roof" title="屋頂">🏠 屋頂</button>
+            <button type="button" id="t-night" title="白天／夜晚">🌙 夜晚</button>
+            <button type="button" id="t-labels" class="on" title="房間名稱">🏷 名稱</button>
+          </div>
+          <div class="seg">
+            <button type="button" id="undo" title="復原（Ctrl+Z）">↶</button>
+            <button type="button" id="redo" title="重做（Ctrl+Y）">↷</button>
+          </div>
+          <div class="dropdown" id="export-dd">
+            <button type="button" id="export-btn" class="primary">⬇ 匯出 ▾</button>
+            <div class="menu" id="export-menu">
+              <button type="button" data-ex="glb"><b>GLB</b><span>VR 眼鏡（Meta Quest）、SteamVR、Unity、Unreal、Blender、Windows 3D 檢視器</span></button>
+              <button type="button" data-ex="usdz"><b>USDZ</b><span>Apple Vision Pro、iPhone／iPad AR 快速查看、Reality Composer</span></button>
+              <button type="button" data-ex="obj"><b>OBJ</b><span>SketchUp、3ds Max、各種 3D 軟體通用</span></button>
+              <button type="button" data-ex="stl"><b>STL</b><span>3D 列印建築模型（1:100）</span></button>
+              <button type="button" data-ex="png"><b>PNG 截圖</b><span>目前 3D 畫面</span></button>
+              <button type="button" data-ex="json"><b>專案檔 .xkplan</b><span>含原圖與所有修改，之後可再開啟</span></button>
+            </div>
+          </div>
+        </div>
+        <div id="walk-help" hidden>
+          <span>🚶 漫遊中：W A S D／方向鍵走動、Shift 加速、拖曳畫面轉頭</span>
+          <button type="button" id="walk-exit" class="ghost small">回到鳥瞰</button>
+        </div>
+        <div id="joystick" hidden><div class="knob"></div></div>
+        <div id="busy" hidden><div class="spinner"></div><span id="busy-text">處理中…</span></div>
+      </section>
+
+      <!-- 右：指令／屬性／歷史 -->
+      <aside id="right" class="panel">
+        <div class="tabs" role="tablist" id="rtabs">
+          <button type="button" data-tab="cmd" class="on">💬 指令</button>
+          <button type="button" data-tab="prop">🔧 屬性</button>
+          <button type="button" data-tab="hist">🕘 歷史</button>
+        </div>
+        <div class="tab-body" data-body="cmd">
+          <div id="chat"></div>
+          <div id="examples" class="chips"></div>
+          <form id="cmd-form">
+            <input type="text" id="cmd" placeholder="例如：把牆壁高度改成 3.5 公尺" autocomplete="off" />
+            <button type="button" id="mic" class="ghost" title="語音輸入">🎤</button>
+            <button type="submit" class="primary">送出</button>
+          </form>
+        </div>
+        <div class="tab-body" data-body="prop" hidden>
+          <div id="props"><p class="muted">在 3D 或 2D 畫面點一下牆、門、窗、柱或房間地板，就能在這裡修改尺寸、顏色與名稱。</p></div>
+        </div>
+        <div class="tab-body" data-body="hist" hidden>
+          <p class="muted small">每次辨識的結果會自動存在這台裝置，點一下就能回到當時的模型。</p>
+          <ul id="history"></ul>
+        </div>
+      </aside>
+    </main>
+
+    <footer id="foot">
+      <span>開發：吳玉柱 先生 與 Claude AI Opus 5.5</span>
+      <span class="muted">構想參考 akaiHuang/ai-floorplan-to-3d（MIT）</span>
+    </footer>
+
+    <input type="file" id="file" accept="image/*,.xkplan,.json" hidden />
+    <input type="file" id="proj-file" accept=".xkplan,.json" hidden />
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,94 @@
+{
+  "name": "xiaoke-floorplan",
+  "version": "1.0.0",
+  "description": "小柯機器人建築平面圖轉3D工具：上傳 2D 建築平面圖，自動辨識牆、門、窗、柱與房間，產生可漫遊的 3D 空間，並可用中英文自然語言指令修改，附語音動態教學",
+  "scripts": {
+    "test": "vitest run",
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "typecheck": "tsc",
+    "app": "vite build && electron .",
+    "electron": "electron .",
+    "dist:win": "tsc && vite build && electron-builder --win nsis portable --x64 --publish never",
+    "dist:mac": "tsc && vite build && electron-builder --mac dmg --publish never",
+    "icon": "python scripts/make_icon.py"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19"
+  },
+  "type": "module",
+  "private": true,
+  "productName": "小柯機器人建築平面圖轉3D工具",
+  "main": "electron/main.cjs",
+  "author": {
+    "name": "吳玉柱",
+    "url": "https://github.com/achir1015"
+  },
+  "homepage": "https://github.com/achir1015/xiaoke-floorplan",
+  "build": {
+    "appId": "com.achir.xiaokefloorplan",
+    "productName": "小柯機器人建築平面圖轉3D工具",
+    "artifactName": "XiaokeFloorplan-${version}-${os}-${arch}.${ext}",
+    "copyright": "Copyright © 2026 吳玉柱",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "build/icon.png",
+      "package.json",
+      "LICENSE"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "executableName": "XiaokeFloorplan"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "小柯機器人建築平面圖轉3D工具",
+      "uninstallDisplayName": "小柯機器人建築平面圖轉3D工具",
+      "language": "1028",
+      "installerLanguages": [
+        "zh_TW"
+      ]
+    },
+    "portable": {
+      "artifactName": "XiaokeFloorplan-${version}-win-x64-portable.${ext}"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "category": "public.app-category.graphics-design",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "identity": null
+    },
+    "dmg": {
+      "title": "小柯機器人建築平面圖轉3D工具 ${version}"
+    },
+    "npmRebuild": false,
+    "afterSign": "build/adhoc-sign.cjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/three": "^0.181.0",
+    "@types/upng-js": "^2.1.5",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "three": "^0.181.2",
+    "typescript": "^7.0.2",
+    "upng-js": "^2.1.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

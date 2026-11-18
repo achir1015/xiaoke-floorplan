@@ -1,0 +1,13 @@
+{
+  "name": "小柯機器人建築平面圖轉3D工具",
+  "short_name": "小柯平面圖3D",
+  "description": "上傳 2D 平面圖，自動產生可漫遊、可用 VR 觀看的 3D 空間",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#eef3f9",
+  "theme_color": "#165099",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

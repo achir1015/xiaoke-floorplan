@@ -1,6 +1,6 @@
 {
   "name": "xiaoke-floorplan",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "小柯機器人建築平面圖轉3D工具：上傳 2D 建築平面圖，自動辨識牆、門、窗、柱與房間，產生可漫遊的 3D 空間，並可用中英文自然語言指令修改，附語音動態教學",
   "scripts": {
     "test": "vitest run",

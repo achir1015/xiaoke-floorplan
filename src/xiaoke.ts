@@ -229,6 +229,7 @@ const STEPS: Step[] = [
   {
     before: () => app().openExport(true),
     target: () => $('#export-menu'),
+    web: '做好的 3D 模型可以下載。VR 眼鏡請選 GLB，Meta Quest、SteamVR、Unity 都能用；Apple Vision Pro 和 iPhone、iPad 的擴增實境請選 USDZ；另外還有 OBJ、3D 列印用的 STL、截圖，以及可以再開啟修改的專案檔。所有處理都在你的瀏覽器裡，平面圖不會上傳到網路。',
     text: '做好的 3D 模型可以匯出。VR 眼鏡請選 GLB，Meta Quest、SteamVR、Unity 都能用；Apple Vision Pro 和 iPhone、iPad 的擴增實境請選 USDZ；另外還有 OBJ、3D 列印用的 STL、截圖，以及可以再開啟修改的專案檔。',
     demo: async () => {
       await wait(9000);
@@ -238,10 +239,12 @@ const STEPS: Step[] = [
   {
     target: () => $('#vr-btn'),
     text: '如果你有 VR 眼鏡，在眼鏡的瀏覽器打開線上版，按「VR」就能用真實比例走進房子裡：左手搖桿移動、右手搖桿轉向，扣板機可以瞬間移動到指著的地方。',
+    web: '如果你戴著 Meta Quest 或 Apple Vision Pro，用眼鏡的瀏覽器打開這個網頁，按「VR」就能用真實比例走進房子裡：左手搖桿移動、右手搖桿轉向，扣板機可以瞬間移動到指著的地方。在電腦上做好的模型，可以匯出專案檔，再到眼鏡上開啟。',
   },
   {
     target: () => $('.xk-update'),
     text: '最後，這顆按鈕會檢查新版本，有更新就能直接下載安裝。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
+    web: '最後，這顆按鈕會檢查新版本，有更新會自動重新整理。旁邊的「桌面版」可以下載 Windows 和 Mac 版。教學到這裡結束，想再聽一次，按上面的「語音教學」就可以了。祝你設計愉快！',
   },
 ];
 

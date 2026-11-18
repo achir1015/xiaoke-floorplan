@@ -433,11 +433,21 @@ export class PlanScene {
     if (!p) return { x: 0, z: 0, yaw: 0 };
     const c = this.boundsCenter();
     const rooms = p.elements.filter((e) => e.type === 'room').sort((a, b) => polygonArea((b as never as { points: [number, number][] }).points) - polygonArea((a as never as { points: [number, number][] }).points));
-    if (rooms.length && rooms[0].type === 'room') {
-      const [x, z] = centroid(rooms[0].points);
-      return { x, z, yaw: Math.atan2(-(c.x - x), -(c.z - z)) || 0 };
+    let [x, z] = [c.x, c.z];
+    if (rooms.length && rooms[0].type === 'room') [x, z] = centroid(rooms[0].points);
+    // 面向最開闊的方向（不要一進去就對著牆）
+    let best = 0, yaw = 0;
+    for (let k = 0; k < 16; k++) {
+      const a = (k / 16) * Math.PI * 2;
+      const dx = -Math.sin(a), dz = -Math.cos(a);
+      let d = 0;
+      while (d < 30 && !this.blocked(x + dx * (d + 0.2), z + dz * (d + 0.2))) d += 0.2;
+      if (d > best) {
+        best = d;
+        yaw = a;
+      }
     }
-    return { x: c.x, z: c.z, yaw: 0 };
+    return { x, z, yaw };
   }
 
   setMode(m: ViewMode) {

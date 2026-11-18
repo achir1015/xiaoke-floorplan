@@ -25,7 +25,7 @@ https://github.com/user-attachments/assets/bdeefeab-f409-41ca-a2e3-ebc4aa4d3520
 | --- | --- |
 | Windows 11 | v1.0.0 起 |
 | macOS（Apple 晶片／Intel） | v1.1.0 起 |
-| 線上版 | 規劃中 |
+| 線上版 https://achir1015.github.io/xiaoke-floorplan/ （VR 眼鏡瀏覽器可直接進入 VR） | v1.2.0 起 |
 | iPhone／iPad（線上安裝） | 規劃中 |
 | Android | 規劃中 |
 

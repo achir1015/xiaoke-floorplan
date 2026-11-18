@@ -5,3 +5,4 @@ release
 CLAUDE.local.md
 .claude
 e2e/out
+tests/local

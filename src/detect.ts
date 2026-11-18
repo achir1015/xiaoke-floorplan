@@ -287,8 +287,46 @@ function parallelLines(mask: Uint8Array, W: number, H: number, s: { horiz: boole
   return lines;
 }
 
+/** 開門弧線：以缺口一端為軸心的四分之一圓，在牆的任一側。缺口量得比門寬時（旁邊有短牆沒抓到），
+ * 半徑從缺口寬往下試。找到就回傳門實際的起訖。 */
+function doorArc(dark: Uint8Array, W: number, H: number, horiz: boolean, c: number, a: number, b: number): { a: number; b: number } | null {
+  const L = b - a;
+  const near = (x: number, y: number) => {
+    for (let dy = -2; dy <= 2; dy++)
+      for (let dx = -2; dx <= 2; dx++) {
+        const xx = Math.round(x + dx), yy = Math.round(y + dy);
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H && dark[yy * W + xx]) return true;
+      }
+    return false;
+  };
+  const N = 24;
+  const arcAt = (hinge: number, dir: number, r: number, side: number) => {
+    let hit = 0;
+    for (let k = 2; k < N - 2; k++) {
+      const ang = (k / N) * (Math.PI / 2);
+      const du = dir * r * Math.cos(ang), dv = side * r * Math.sin(ang);
+      const x = horiz ? hinge + du : c + dv, y = horiz ? c + dv : hinge + du;
+      if (near(x, y)) {
+        hit++;
+      } else if (k - 1 - hit > (N - 4) * 0.3) return false;
+    }
+    return hit / (N - 4) >= 0.7;
+  };
+  for (let f = 1; f >= 0.55; f -= 0.05) {
+    const r = L * f;
+    if (r < 8) break;
+    // 軸心可能不在缺口正端點（轉角短牆沒抓到）：在缺口內滑動
+    for (let d = 0; d <= L - r + 0.5; d += 2)
+      for (const side of [-1, 1]) {
+        if (arcAt(a + d, 1, r, side)) return { a: a + d, b: a + d + r };
+        if (arcAt(b - d, -1, r, side)) return { a: b - d - r, b: b - d };
+      }
+  }
+  return null;
+}
+
 /** 合併同一直線上的牆段，並找出中間的門窗 */
-function joinAndFindOpenings(segs: Seg[], dark: Uint8Array, wallMask: Uint8Array, W: number, H: number, T: number, mPerPx: number, hollow = false) {
+function joinAndFindOpenings(segs: Seg[], dark: Uint8Array, wallMask: Uint8Array, W: number, H: number, T: number, mPerPx: number, hollow = false, ink: Uint8Array = dark) {
   const walls: Seg[] = [];
   const openings: { horiz: boolean; a: number; b: number; c: number; t: number; kind: 'door' | 'window' }[] = [];
   const minOpen = 0.45 / mPerPx, maxOpen = 3.2 / mPerPx;
@@ -354,7 +392,11 @@ function joinAndFindOpenings(segs: Seg[], dark: Uint8Array, wallMask: Uint8Array
           if (wallIn < 0.35) {
             const cov = coverage(dark, W, H, line, cur.b + 1, s.a - 1, t * 0.5);
             const nl = parallelLines(dark, W, H, line, cur.b, s.a, t * 0.6);
-            openings.push({ horiz, a: cur.b, b: s.a, c, t, kind: cov > 0.75 && nl >= 1 ? 'window' : 'door' });
+            // 門片畫在牆線上也會像一條平行線：有開門弧線就一定是門
+            const arc = doorArc(ink, W, H, horiz, c, cur.b, s.a);
+            // 沒有弧線也沒有窗框線：是沒有門的走道開口（例如客廳通餐廳），不放門
+            if (arc) openings.push({ horiz, a: arc.a, b: arc.b, c, t, kind: 'door' });
+            else if (cov > 0.75 && nl >= 1) openings.push({ horiz, a: cur.b, b: s.a, c, t, kind: 'window' });
           }
         }
         pushWall(cur);
@@ -363,8 +405,49 @@ function joinAndFindOpenings(segs: Seg[], dark: Uint8Array, wallMask: Uint8Array
       pushWall(cur);
     }
   }
+  // 牆的盡頭到「另一道牆」之間的缺口：門常開在牆角旁（門的一邊靠著垂直的牆），
+  // 窗也常一路畫到轉角。沿著牆的方向往外找，碰到別的牆、距離像門窗寬度就算開口。
+  const solidAt = (s: { horiz: boolean; c: number; t: number }, u: number) => {
+    let hit = 0, tot = 0;
+    for (let v = Math.round(s.c - s.t * 0.25); v <= Math.round(s.c + s.t * 0.25); v++) {
+      const x = s.horiz ? u : v, y = s.horiz ? v : u;
+      tot++;
+      if (x >= 0 && y >= 0 && x < W && y < H && wallMask[y * W + x]) hit++;
+    }
+    return tot > 0 && hit / tot >= 0.5;
+  };
+  const inWall = (x: number, y: number) =>
+    walls.some((w) => {
+      const [x0, y0, x1, y1] = w.horiz ? [w.a, w.c - w.t / 2, w.b, w.c + w.t / 2] : [w.c - w.t / 2, w.a, w.c + w.t / 2, w.b];
+      return x >= x0 - 2 && x <= x1 + 2 && y >= y0 - 2 && y <= y1 + 2;
+    });
+  const taken = (horiz: boolean, c: number, a: number, b: number) =>
+    openings.some((o) => o.horiz === horiz && Math.abs(o.c - c) < T && o.a < b - 2 && o.b > a + 2);
+  for (const w of [...walls]) {
+    for (const dir of [-1, 1]) {
+      const start = dir < 0 ? Math.floor(w.a) - 1 : Math.ceil(w.b);
+      let u = start;
+      const max = maxOpen;
+      while (Math.abs(u - start) <= max && u >= 0 && u < (w.horiz ? W : H) && !solidAt(w, u)) u += dir;
+      const d = Math.abs(u - start);
+      if (d < minOpen || d > max || u < 0 || u >= (w.horiz ? W : H)) continue;
+      // 碰到的一定要是辨識出來的牆（不是家具的粗線）
+      const hx = w.horiz ? u : w.c, hy = w.horiz ? w.c : u;
+      if (!inWall(hx, hy)) continue;
+      const a = Math.min(start, u - dir), b = Math.max(start, u - dir) + 1;
+      if (taken(w.horiz, w.c, a, b)) continue;
+      const line = { horiz: w.horiz, c: w.c };
+      const cov = coverage(dark, W, H, line, a + 1, b - 1, w.t * 0.5);
+      const nl = parallelLines(dark, W, H, line, a, b, w.t * 0.6);
+      // 沒有門的走道開口很常見：要看到窗框（2 條以上平行線）或開門弧線才算門窗
+      const arc = doorArc(ink, W, H, w.horiz, w.c, a, b);
+      if (arc) openings.push({ horiz: w.horiz, a: arc.a, b: arc.b, c: w.c, t: w.t, kind: 'door' });
+      else if (cov > 0.75 && nl >= 2) openings.push({ horiz: w.horiz, a, b, c: w.c, t: w.t, kind: 'window' });
+    }
+  }
   return { walls, openings };
 }
+
 
 /** 外框追蹤（Moore 鄰域）＋ Douglas-Peucker 簡化 */
 function tracePolygon(lab: Int32Array, id: number, W: number, H: number, start: number, eps: number): [number, number][] {
@@ -431,6 +514,10 @@ export function detect(img: Img, opt: DetectOptions = {}): DetectResult {
   let dark = new Uint8Array(W * H);
   for (let i = 0; i < gray.length; i++) dark[i] = gray[i] <= thr ? 1 : 0;
   const orig = dark;
+  // 淡的細線（開門弧線常畫得比較淡、掃描後更淡）：比牆的門檻寬鬆
+  const inkThr = Math.min(225, thr + 60);
+  const ink = new Uint8Array(W * H);
+  for (let i = 0; i < gray.length; i++) ink[i] = gray[i] <= inkThr ? 1 : 0;
   let { hr, vr } = runs(dark, W, H);
   let { T, weight } = estimateThickness(dark, hr, vr, Math.max(W, H));
   let hollowFilled = false;
@@ -478,20 +565,42 @@ export function detect(img: Img, opt: DetectOptions = {}): DetectResult {
   {
     const group = segs.map((_, i) => i);
     const find = (i: number): number => (group[i] === i ? i : (group[i] = find(group[i])));
+    const touch = (r: number[], q: number[]) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1];
+    // 第一步：直接相接，或同一直線上隔著門窗缺口（10 倍牆厚以內）
     for (let i = 0; i < segs.length; i++) {
       const r = rectOf(segs[i], T);
       for (let j = i + 1; j < segs.length; j++) {
-        const q = rectOf(segs[j], 0);
-        if (r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1]) group[find(i)] = find(j);
+        const p = segs[i], q = segs[j];
+        const collinear = p.horiz === q.horiz && Math.abs(p.c - q.c) < T * 0.6 && Math.max(p.a, q.a) - Math.min(p.b, q.b) <= 10 * T;
+        if (collinear || touch(r, rectOf(q, 0))) group[find(i)] = find(j);
       }
     }
     const total = new Map<number, number>();
     segs.forEach((s, i) => total.set(find(i), (total.get(find(i)) ?? 0) + s.b - s.a));
     const biggest = Math.max(0, ...total.values());
-    const keep = segs.filter((_, i) => (total.get(find(i)) ?? 0) >= biggest * 0.2);
+    const kept = new Set([...total].filter(([, v]) => v >= biggest * 0.2).map(([k]) => k));
+    // 第二步：夠長的牆群（不是文字）隔著轉角的門窗跟主建築相鄰，也留下
+    const ext = (s: Seg) => {
+      const r = rectOf(s, T);
+      const e = 10 * T;
+      return s.horiz ? [r[0] - e, r[1], r[2] + e, r[3]] : [r[0], r[1] - e, r[2], r[3] + e];
+    };
+    for (let round = 0; round < 6; round++) {
+      let added = false;
+      for (const [g, v] of total) {
+        if (kept.has(g) || v < 25 * T) continue;
+        const near = segs.some((p, i) => find(i) === g && segs.some((q, j) => kept.has(find(j)) && (touch(ext(p), rectOf(q, 0)) || touch(ext(q), rectOf(p, 0)))));
+        if (near) {
+          kept.add(g);
+          added = true;
+        }
+      }
+      if (!added) break;
+    }
+    const keep = segs.filter((_, i) => kept.has(find(i)));
     segs.splice(0, segs.length, ...keep);
   }
-  let { walls, openings } = joinAndFindOpenings(segs, orig, wall, W, H, T, mPerPx, hollowFilled);
+  let { walls, openings } = joinAndFindOpenings(segs, orig, wall, W, H, T, mPerPx, hollowFilled, ink);
   // 依門寬推算比例：一般室內門約 90 公分，比牆厚可靠（牆厚各家畫法差很多）
   if (!opt.mPerPx && (opt.scaleBy ?? 'door') === 'door') {
     const doors = openings.filter((o) => o.kind === 'door').map((o) => o.b - o.a).sort((a, b) => a - b);
@@ -502,7 +611,7 @@ export function detect(img: Img, opt: DetectOptions = {}): DetectResult {
       if (k / mPerPx < 3 && mPerPx / k < 3) {
         mPerPx = k;
         scaleSource = 'door';
-        ({ walls, openings } = joinAndFindOpenings(segs, orig, wall, W, H, T, mPerPx, hollowFilled));
+        ({ walls, openings } = joinAndFindOpenings(segs, orig, wall, W, H, T, mPerPx, hollowFilled, ink));
       }
     }
   }
@@ -632,12 +741,6 @@ export function detect(img: Img, opt: DetectOptions = {}): DetectResult {
       sill: door ? 0 : 0.9,
       angle: o.horiz ? 0 : Math.PI / 2,
     };
-    // 很寬的門洞（> 1.6 m）多半是落地窗或拉門開口：當作落地窗
-    if (door && len > 1.6) {
-      el.type = 'window';
-      el.sill = 0.05;
-      el.height = Math.min(2.2, wallH - 0.2);
-    }
     plan.elements.push(el);
   }
   for (const c of cols) plan.elements.push({ ...c, x: X(c.x), z: Z(c.z), w: +(c.w * mPerPx).toFixed(3), d: +(c.d * mPerPx).toFixed(3) });
